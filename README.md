@@ -1,5 +1,9 @@
 # Otto
 
+<p align="center">
+  <img src="assets/social-preview.png" alt="Otto social preview" width="760" />
+</p>
+
 Otto is a Chrome extension side assistant for chatting with the current page.
 
 It supports:
