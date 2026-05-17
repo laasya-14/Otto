@@ -1,6 +1,6 @@
 export type Role = "user" | "assistant" | "system" | "tool";
 
-export type Provider = "anthropic" | "openai";
+export type Provider = "anthropic" | "openai" | "google";
 
 export interface ModelInfo {
   id: string;
@@ -11,7 +11,7 @@ export interface ModelInfo {
 }
 
 export interface Attachment {
-  kind: "selection" | "page" | "tool_result";
+  kind: "selection" | "page" | "tool_result" | "video_url";
   url?: string;
   title?: string;
   text: string;

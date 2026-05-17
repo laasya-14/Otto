@@ -22,6 +22,7 @@ export default defineManifest({
   host_permissions: [
     "https://api.anthropic.com/*",
     "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "<all_urls>",
   ],
   side_panel: { default_path: "src/sidepanel/index.html" },

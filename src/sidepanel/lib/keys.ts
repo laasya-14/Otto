@@ -1,9 +1,11 @@
 export interface Settings {
   anthropicKey?: string;
   openaiKey?: string;
+  geminiKey?: string;
   defaultModelId?: string;
   truncationCap?: number;
   allowedFetchDomains?: string[];
+  customInstructions?: string;
 }
 
 const KEY = "side.settings";

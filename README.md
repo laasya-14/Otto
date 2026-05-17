@@ -33,8 +33,9 @@ npm run build
 
 ## Shortcuts
 
-- `⌘⇧L` / `Ctrl+Shift+L`: open with selected text and page context
-- `⌘⇧U` / `Ctrl+Shift+U`: attach the current page
+- `⌘⇧l` / `Ctrl+Shift+l`: open with selected text and page context
+- `⌘⇧u` / `Ctrl+Shift+U`: attach the current page
+- `⌘⇧o` / `Ctrl+Shift+o`: open the extension
 
 Shortcut bindings can be changed in `chrome://extensions/shortcuts`.
 

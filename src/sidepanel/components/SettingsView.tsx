@@ -4,13 +4,16 @@ import { MODELS } from "../lib/models";
 import { deleteAllConversations } from "../lib/db";
 
 type TestState = { state: "idle" | "ok" | "err" | "loading"; msg?: string };
+const providerLabels: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
 export function SettingsView() {
   const [s, setS] = useState<Settings>({});
   const [showA, setShowA] = useState(false);
   const [showO, setShowO] = useState(false);
+  const [showG, setShowG] = useState(false);
   const [testA, setTestA] = useState<TestState>({ state: "idle" });
   const [testO, setTestO] = useState<TestState>({ state: "idle" });
+  const [testG, setTestG] = useState<TestState>({ state: "idle" });
   const [saved, setSaved] = useState(false);
   const [clipboardMsg, setClipboardMsg] = useState<string | null>(null);
 
@@ -60,6 +63,20 @@ export function SettingsView() {
       else setTestO({ state: "err", msg: `${r.status}: ${await r.text()}` });
     } catch (e: any) {
       setTestO({ state: "err", msg: e?.message ?? String(e) });
+    }
+  }
+
+  async function testGemini() {
+    if (!s.geminiKey) return;
+    setTestG({ state: "loading" });
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${s.geminiKey}`
+      );
+      if (r.ok) setTestG({ state: "ok", msg: "Gemini key OK" });
+      else setTestG({ state: "err", msg: `${r.status}: ${await r.text()}` });
+    } catch (e: any) {
+      setTestG({ state: "err", msg: e?.message ?? String(e) });
     }
   }
 
@@ -140,6 +157,31 @@ export function SettingsView() {
           {testO.state === "loading" ? "Testing…" : testO.msg}
         </div>
       )}
+
+      <label>Google Gemini API key</label>
+      <div className="row">
+        <input
+          type={showG ? "text" : "password"}
+          value={s.geminiKey ?? ""}
+          placeholder="AIza…"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => save({ geminiKey: e.target.value })}
+        />
+        <button className="test" onClick={() => setShowG((v) => !v)}>{showG ? "Hide" : "Show"}</button>
+        <button
+          className="test"
+          onClick={() => pasteFromClipboard("geminiKey" as any)}
+          title="Paste from clipboard"
+        >Paste</button>
+        <button className="test" onClick={testGemini} disabled={!s.geminiKey}>Test</button>
+      </div>
+      {testG.state !== "idle" && (
+        <div className={`status ${testG.state === "ok" ? "ok" : testG.state === "err" ? "err" : ""}`}>
+          {testG.state === "loading" ? "Testing…" : testG.msg}
+        </div>
+      )}
+
       {clipboardMsg && <div className="status">{clipboardMsg}</div>}
 
       <h2>Defaults</h2>
@@ -148,8 +190,27 @@ export function SettingsView() {
         value={s.defaultModelId ?? MODELS[1].id}
         onChange={(e) => save({ defaultModelId: e.target.value })}
       >
-        {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+        {Object.entries(
+          MODELS.reduce<Record<string, typeof MODELS>>((acc, m) => {
+            (acc[m.provider] ??= []).push(m);
+            return acc;
+          }, {})
+        ).map(([provider, models]) => (
+          <optgroup key={provider} label={providerLabels[provider] ?? provider}>
+            {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </optgroup>
+        ))}
       </select>
+
+      <h2>Custom instructions</h2>
+      <label>Appended to every conversation</label>
+      <textarea
+        rows={4}
+        value={s.customInstructions ?? ""}
+        placeholder="e.g. Always reply in Spanish. Prefer bullet points."
+        onChange={(e) => save({ customInstructions: e.target.value })}
+        style={{ width: "100%", marginTop: 4 }}
+      />
 
       <h2>Shortcuts</h2>
       <div className="status">

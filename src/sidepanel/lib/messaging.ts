@@ -47,3 +47,14 @@ export function onFocusComposer(cb: () => void) {
   chrome.runtime.onMessage.addListener(listener);
   return () => chrome.runtime.onMessage.removeListener(listener);
 }
+
+export async function getActiveTab(): Promise<{ url: string; title: string } | null> {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tab = tabs[0];
+    if (!tab?.url) return null;
+    return { url: tab.url, title: tab.title ?? tab.url };
+  } catch {
+    return null;
+  }
+}

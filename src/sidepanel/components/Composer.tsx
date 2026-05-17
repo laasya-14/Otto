@@ -2,7 +2,20 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Attachment } from "../../shared/types";
 import { db } from "../lib/db";
-import { bgGetPage, bgGetSelection, fetchFocusComposer, onFocusComposer } from "../lib/messaging";
+import { bgGetPage, bgGetSelection, fetchFocusComposer, onFocusComposer, getActiveTab } from "../lib/messaging";
+
+function isYouTubeWatchUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "www.youtube.com" || u.hostname === "youtube.com") &&
+      u.pathname === "/watch" &&
+      Boolean(u.searchParams.get("v"))
+    );
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   pendingAttachments: Attachment[];
@@ -17,6 +30,7 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
   const [text, setText] = useState("");
   const [attachError, setAttachError] = useState<string | null>(null);
   const [slashIndex, setSlashIndex] = useState(0);
+  const [activeTabIsYouTube, setActiveTabIsYouTube] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   const focusBurstRef = useRef<number | null>(null);
   const skills = useLiveQuery(() => db.skills.orderBy("trigger").toArray(), []);
@@ -58,6 +72,25 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    getActiveTab().then((tab) => {
+      if (!cancelled && tab?.url) setActiveTabIsYouTube(isYouTubeWatchUrl(tab.url));
+    });
+    const handler = () => {
+      getActiveTab().then((tab) => {
+        if (!cancelled && tab?.url) setActiveTabIsYouTube(isYouTubeWatchUrl(tab.url));
+      });
+    };
+    chrome.tabs?.onActivated?.addListener(handler);
+    chrome.tabs?.onUpdated?.addListener(handler);
+    return () => {
+      cancelled = true;
+      chrome.tabs?.onActivated?.removeListener(handler);
+      chrome.tabs?.onUpdated?.removeListener(handler);
+    };
+  }, []);
+
+  useEffect(() => {
     if (pendingAttachments.length === 0) return;
     const id = window.setTimeout(focusComposerBurst, 0);
     return () => window.clearTimeout(id);
@@ -68,7 +101,13 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") focusComposerBurst();
     };
-    const handlePointerDown = () => focusComposerBurst(400);
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("select, button, input, textarea, a, [role='button'], [role='menuitem'], [contenteditable='true']")) {
+        return;
+      }
+      focusComposerBurst(400);
+    };
     window.addEventListener("focus", handleWindowFocus);
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("pointerdown", handlePointerDown);
@@ -116,6 +155,21 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
     } else {
       setAttachError("No selected text was found in the active tab.");
     }
+  }
+
+  async function attachYouTubeVideo() {
+    setAttachError(null);
+    const tab = await getActiveTab();
+    if (!tab?.url || !isYouTubeWatchUrl(tab.url)) {
+      setAttachError("Current tab is not a YouTube video. Navigate to a youtube.com/watch?v=… page.");
+      return;
+    }
+    mergeAttachment({
+      kind: "video_url",
+      url: tab.url,
+      title: tab.title,
+      text: tab.url,
+    });
   }
 
   function submit() {
@@ -187,8 +241,14 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
       {pendingAttachments.length > 0 && (
         <div className="chips">
           {pendingAttachments.map((a, i) => (
-            <span key={`${a.kind}:${a.url ?? ""}:${i}`} className={`chip chip-${a.kind}${i === freshIdx ? " fresh" : ""}`} title={a.text.slice(0, 280)}>
-              <span className="chip-label">{a.kind === "page" ? "Page context" : "Selected text"}</span>
+            <span
+              key={`${a.kind}:${a.url ?? ""}:${i}`}
+              className={`chip chip-${a.kind}${i === freshIdx ? " fresh" : ""}`}
+              title={a.kind === "video_url" ? (a.url ?? "") : a.text.slice(0, 280)}
+            >
+              <span className="chip-label">
+                {a.kind === "page" ? "Page" : a.kind === "selection" ? "Selection" : a.kind === "video_url" ? "▶ Video" : a.kind}
+              </span>
               <span className="chip-title">
                 {a.kind === "selection"
                   ? a.text.replace(/\s+/g, " ").slice(0, 72)
@@ -255,9 +315,12 @@ export function Composer({ pendingAttachments, freshIdx, setPendingAttachments, 
         <button className="send" disabled={disabled} onClick={submit}>Send</button>
       </div>
       <div className="actions">
-        <button type="button" onClick={attachSelection}>Add selected text</button>
-        <button type="button" onClick={attachCurrentPage}>Add page context</button>
-        <span style={{ marginLeft: "auto" }}>/ for skills · ⌘⇧L selection + page</span>
+        <button type="button" onClick={attachSelection}>Add selection</button>
+        <button type="button" onClick={attachCurrentPage}>Add page</button>
+        {activeTabIsYouTube && (
+          <button type="button" className="action-youtube" onClick={attachYouTubeVideo}>▶ Attach video</button>
+        )}
+        <span style={{ marginLeft: "auto" }}>/ skills · ⌘⇧L</span>
       </div>
       {attachError && <div className="composer-note composer-note-err">{attachError}</div>}
     </div>

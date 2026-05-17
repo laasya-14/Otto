@@ -29,9 +29,11 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
   const [freshChipIdx, setFreshChipIdx] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; kind: "ok" | "err" } | null>(null);
   const [sending, setSending] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const handledPendingStamp = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   function showToast(msg: string, kind: "ok" | "err" = "ok") {
     setToast({ msg, kind });
@@ -137,24 +139,43 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
     await db.conversations.update(conversationId, { modelId: id, updatedAt: Date.now() });
   }
 
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
   async function handleSend(text: string, attachments: Attachment[]) {
     setError(null);
     setSending(true);
+    setStreaming(false);
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       await sendUserMessage({
         conversationId,
         userText: text,
         attachments,
-        onUpdate: () => {},
+        onUpdate: () => setStreaming(true),
+        signal: controller.signal,
       });
     } catch (e: any) {
-      setError(e?.message ?? String(e));
+      if ((e as any)?.name !== "AbortError") {
+        setError(e?.message ?? String(e));
+      }
     } finally {
       setSending(false);
+      setStreaming(false);
+      abortRef.current = null;
     }
   }
 
   if (!conv) return <div className="empty">Loading…</div>;
+
+  const isCompacted = Boolean(conv.summary);
+  const modelsByProvider = MODELS.reduce<Record<string, typeof MODELS>>((acc, m) => {
+    (acc[m.provider] ??= []).push(m);
+    return acc;
+  }, {});
+  const providerLabels: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
   return (
     <>
@@ -163,11 +184,20 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
         <span className="chat-title">
           {conv.title}
         </span>
-        <select value={conv.modelId} onChange={(e) => changeModel(e.target.value)}>
-          {MODELS.map((m) => (
-            <option key={m.id} value={m.id}>{m.label}</option>
-          ))}
-        </select>
+        <div className="topbar-right">
+          <select value={conv.modelId} onChange={(e) => changeModel(e.target.value)}>
+            {Object.entries(modelsByProvider).map(([provider, models]) => (
+              <optgroup key={provider} label={providerLabels[provider] ?? provider}>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {sending && (
+            <button className="stop-btn" onClick={handleStop} title="Stop generating">■ Stop</button>
+          )}
+        </div>
       </div>
       <div className="messages" ref={scrollRef}>
         {(!messages || messages.length === 0) && (
@@ -175,7 +205,17 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
             Ask about the current page, or capture a highlight with <strong>⌘⇧L</strong>.
           </div>
         )}
+        {isCompacted && (
+          <div className="compacted-badge" title="Earlier messages were summarized to fit the context window">
+            ↑ earlier context summarized
+          </div>
+        )}
         {messages?.map((m) => <MessageRow key={m.id} m={m} />)}
+        {streaming && !error && (
+          <div className="streaming-indicator">
+            <span className="streaming-dot" /><span className="streaming-dot" /><span className="streaming-dot" />
+          </div>
+        )}
         {error && (
           <div className="msg assistant">
             <div className="role">error</div>

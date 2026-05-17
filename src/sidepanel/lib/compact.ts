@@ -3,6 +3,7 @@ import { db } from "./db";
 import { getModel, CHEAP_SUMMARIZER } from "./models";
 import { anthropicNonStream } from "./anthropic";
 import { openaiNonStream } from "./openai";
+import { geminiNonStream } from "./gemini";
 import type { Settings } from "./keys";
 
 const COMPACT_TRIGGER = 0.7;
@@ -137,7 +138,7 @@ async function summarize(
     })
     .join("\n\n");
 
-  const prompt = `You are summarizing a conversation between a user and an AI assistant about webpages. Preserve all facts, decisions, code, URLs, identifiers, and any user preferences expressed. Output ≤500 tokens of plain prose. Do not editorialize.
+  const prompt = `You are compacting a conversation between a user and Otto (a browser sidekick AI). Preserve all facts, decisions, code snippets, URLs, identifiers, page titles, and any preferences the user expressed. Write ≤500 tokens of plain prose. Stay factual — do not add commentary or opinions.
 
 ${prior ? `Existing summary:\n${prior}\n\n` : ""}New turns to incorporate:\n${transcript}`;
 
@@ -158,6 +159,14 @@ ${prior ? `Existing summary:\n${prior}\n\n` : ""}New turns to incorporate:\n${tr
       apiKey: settings.openaiKey,
       model: CHEAP_SUMMARIZER.openai,
       messages: [fakeMsg],
+    });
+  }
+  if (settings.geminiKey) {
+    return geminiNonStream({
+      apiKey: settings.geminiKey,
+      model: CHEAP_SUMMARIZER.google,
+      messages: [fakeMsg],
+      maxTokens: 700,
     });
   }
   // No keys — return prior + truncated transcript.
