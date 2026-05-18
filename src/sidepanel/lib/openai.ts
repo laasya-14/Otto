@@ -67,16 +67,18 @@ export async function streamOpenAI(opts: {
   apiKey: string;
   model: string;
   messages: Message[];
+  reasoningEffort?: string;
   tools?: OpenAIToolDef[];
   signal?: AbortSignal;
   cb: OpenAIStreamCallbacks;
 }) {
-  const { apiKey, model, messages, tools, signal, cb } = opts;
+  const { apiKey, model, messages, reasoningEffort, tools, signal, cb } = opts;
   const body: any = {
     model,
     stream: true,
     messages: toOpenAIMessages(messages),
   };
+  if (reasoningEffort) body.reasoning_effort = reasoningEffort;
   if (tools?.length) body.tools = tools;
 
   let resp: Response;
@@ -152,14 +154,20 @@ export async function openaiNonStream(opts: {
   apiKey: string;
   model: string;
   messages: Message[];
+  reasoningEffort?: string;
 }): Promise<string> {
+  const body: any = {
+    model: opts.model,
+    messages: toOpenAIMessages(opts.messages),
+  };
+  if (opts.reasoningEffort) body.reasoning_effort = opts.reasoningEffort;
   const r = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       Authorization: `Bearer ${opts.apiKey}`,
     },
-    body: JSON.stringify({ model: opts.model, messages: toOpenAIMessages(opts.messages) }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`OpenAI ${r.status}: ${await r.text()}`);
   const j = await r.json();

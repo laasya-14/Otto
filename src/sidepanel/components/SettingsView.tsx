@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { loadSettings, saveSettings, type Settings } from "../lib/keys";
 import { MODELS } from "../lib/models";
 import { deleteAllConversations } from "../lib/db";
+import { ModelPicker } from "./ModelPicker";
 
 type TestState = { state: "idle" | "ok" | "err" | "loading"; msg?: string };
-const providerLabels: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
 export function SettingsView() {
   const [s, setS] = useState<Settings>({});
@@ -186,21 +186,12 @@ export function SettingsView() {
 
       <h2>Defaults</h2>
       <label>Default model</label>
-      <select
-        value={s.defaultModelId ?? MODELS[1].id}
-        onChange={(e) => save({ defaultModelId: e.target.value })}
-      >
-        {Object.entries(
-          MODELS.reduce<Record<string, typeof MODELS>>((acc, m) => {
-            (acc[m.provider] ??= []).push(m);
-            return acc;
-          }, {})
-        ).map(([provider, models]) => (
-          <optgroup key={provider} label={providerLabels[provider] ?? provider}>
-            {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </optgroup>
-        ))}
-      </select>
+      <div className="settings-picker-row">
+        <ModelPicker
+          value={s.defaultModelId ?? MODELS[1].id}
+          onChange={(id) => save({ defaultModelId: id })}
+        />
+      </div>
 
       <h2>Custom instructions</h2>
       <label>Appended to every conversation</label>

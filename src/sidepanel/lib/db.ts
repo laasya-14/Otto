@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Conversation, Message, Skill } from "../../shared/types";
+import type { Conversation, Message, OpenAIReasoningEffort, Skill } from "../../shared/types";
 
 export interface Note {
   id: string;
@@ -33,6 +33,7 @@ export const db = new SideDB();
 
 export async function createConversation(
   modelId: string,
+  reasoningEffort?: OpenAIReasoningEffort,
   title = "New chat"
 ): Promise<Conversation> {
   const now = Date.now();
@@ -40,6 +41,7 @@ export async function createConversation(
     id: crypto.randomUUID(),
     title,
     modelId,
+    reasoningEffort,
     createdAt: now,
     updatedAt: now,
   };

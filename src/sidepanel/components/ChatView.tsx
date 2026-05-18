@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { Attachment, PendingContext } from "../../shared/types";
+import type { Attachment, PendingContext, OpenAIReasoningEffort } from "../../shared/types";
 import { db } from "../lib/db";
-import { MODELS } from "../lib/models";
+import { getReasoningEfforts } from "../lib/models";
 import { fetchPendingContext, onPendingContext } from "../lib/messaging";
 import { sendUserMessage } from "../lib/chat";
 import { Composer } from "./Composer";
 import { MessageRow } from "./Message";
+import { ModelPicker, EffortPicker } from "./ModelPicker";
 
 interface Props {
   conversationId: string;
@@ -139,6 +140,10 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
     await db.conversations.update(conversationId, { modelId: id, updatedAt: Date.now() });
   }
 
+  async function changeReasoningEffort(reasoningEffort: OpenAIReasoningEffort | undefined) {
+    await db.conversations.update(conversationId, { reasoningEffort, updatedAt: Date.now() });
+  }
+
   function handleStop() {
     abortRef.current?.abort();
   }
@@ -171,11 +176,7 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
   if (!conv) return <div className="empty">Loading…</div>;
 
   const isCompacted = Boolean(conv.summary);
-  const modelsByProvider = MODELS.reduce<Record<string, typeof MODELS>>((acc, m) => {
-    (acc[m.provider] ??= []).push(m);
-    return acc;
-  }, {});
-  const providerLabels: Record<string, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
+  const efforts = getReasoningEfforts(conv.modelId);
 
   return (
     <>
@@ -185,15 +186,14 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
           {conv.title}
         </span>
         <div className="topbar-right">
-          <select value={conv.modelId} onChange={(e) => changeModel(e.target.value)}>
-            {Object.entries(modelsByProvider).map(([provider, models]) => (
-              <optgroup key={provider} label={providerLabels[provider] ?? provider}>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <ModelPicker value={conv.modelId} onChange={changeModel} />
+          {efforts.length > 0 && (
+            <EffortPicker
+              value={conv.reasoningEffort ?? ""}
+              options={efforts}
+              onChange={(v) => changeReasoningEffort(v as OpenAIReasoningEffort | undefined)}
+            />
+          )}
           {sending && (
             <button className="stop-btn" onClick={handleStop} title="Stop generating">■ Stop</button>
           )}

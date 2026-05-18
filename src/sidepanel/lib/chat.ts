@@ -126,6 +126,7 @@ export async function sendUserMessage(opts: SendOpts) {
     } else {
       await streamOpenAI({
         apiKey, model: model.id, messages: built.toSend,
+        reasoningEffort: fresh.reasoningEffort,
         tools: openaiTools(TOOLS), signal: opts.signal, cb,
       });
     }

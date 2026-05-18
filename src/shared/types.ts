@@ -1,6 +1,7 @@
 export type Role = "user" | "assistant" | "system" | "tool";
 
 export type Provider = "anthropic" | "openai" | "google";
+export type OpenAIReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
 export interface ModelInfo {
   id: string;
@@ -8,6 +9,7 @@ export interface ModelInfo {
   provider: Provider;
   contextWindow: number;
   supportsVision?: boolean;
+  reasoningEfforts?: OpenAIReasoningEffort[];
 }
 
 export interface Attachment {
@@ -44,6 +46,7 @@ export interface Conversation {
   id: string;
   title: string;
   modelId: string;
+  reasoningEffort?: OpenAIReasoningEffort;
   createdAt: number;
   updatedAt: number;
   summary?: string;
