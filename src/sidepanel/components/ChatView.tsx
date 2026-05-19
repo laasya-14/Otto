@@ -144,6 +144,30 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
     await db.conversations.update(conversationId, { reasoningEffort, updatedAt: Date.now() });
   }
 
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  function beginEditTitle() {
+    setTitleDraft(conv?.title ?? "");
+    setEditingTitle(true);
+    requestAnimationFrame(() => {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    });
+  }
+
+  async function commitTitle() {
+    const next = titleDraft.trim();
+    setEditingTitle(false);
+    if (!next || next === conv?.title) return;
+    await db.conversations.update(conversationId, { title: next, updatedAt: Date.now() });
+  }
+
+  function cancelEditTitle() {
+    setEditingTitle(false);
+  }
+
   function handleStop() {
     abortRef.current?.abort();
   }
@@ -182,9 +206,40 @@ export function ChatView({ conversationId, onOpenSettings, onOpenSkills }: Props
     <>
       {toast && <div className={`toast ${toast.kind === "err" ? "err" : ""}`}>{toast.msg}</div>}
       <div className="topbar chat-header">
-        <span className="chat-title">
-          {conv.title}
-        </span>
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            className="chat-title chat-title-input"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                titleInputRef.current?.blur();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancelEditTitle();
+              }
+            }}
+          />
+        ) : (
+          <span
+            className="chat-title"
+            role="button"
+            tabIndex={0}
+            title="Click to rename"
+            onClick={beginEditTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                beginEditTitle();
+              }
+            }}
+          >
+            {conv.title}
+          </span>
+        )}
         <div className="topbar-right">
           <ModelPicker value={conv.modelId} onChange={changeModel} />
           {efforts.length > 0 && (

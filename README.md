@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-dark.svg" alt="Otto" width="420" />
+  <img src="assets/readme_otter.svg" alt="Otto" width="420" />
 </p>
 
 Otto is a Chrome extension side assistant for chatting with the current page.
